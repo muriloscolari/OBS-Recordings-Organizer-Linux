@@ -64,3 +64,5 @@ python -m pip install --upgrade pip
 2) If Pywin32 gives you any troubles, first uninstall it with ```pip uninstall pywin32``` and then download it from [here](https://github.com/mhammond/pywin32/releases/tag/b306) choosing *py312* version.
 ####
 3) Recordings not organized into subfolder or not renamed: it can occur in the first/second recording or buffer replay, but no more further because the script only needed to create its cache.
+## Credits
+All credit for the default sounds (success.mp3 and error.mp3) go to [Sjonas88](https://freesound.org/people/Sjonas88/) on freesound.org

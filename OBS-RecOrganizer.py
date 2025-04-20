@@ -5,6 +5,10 @@ from ctypes import windll
 from datetime import datetime, timedelta
 import pathlib
 import subprocess
+import traceback
+
+import version
+import playsound
 
 # UTILS FUNCS
 ##############################
@@ -104,6 +108,12 @@ class Data:
     FFMPEGExePath = None
     FFPROBEExePath = None
 
+    PlaySoundSuccess = None
+    DefaultSuccessSound = None
+
+    PlaySoundError = None
+    DefaultErrorSound = None
+
     # non-property vars
     LastEndTimeStamp = None
 
@@ -134,6 +144,32 @@ def get_ffprobe_exe_path():
             ffprobe_path = "ffprobe"
     res = ffprobe_path
     print("ffprobe_path",res)
+    return res
+
+def get_playsound_success_bool():
+    return Data.PlaySoundSuccess if Data.PlaySoundSuccess is not None else False
+
+def get_playsound_error_bool():
+    return Data.PlaySoundError if Data.PlaySoundError is not None else False
+
+def get_default_success_sound():
+    default_success_sound = Data.DefaultSuccessSound
+    if default_success_sound is None or default_success_sound == '' or default_success_sound == "DEFAULT":
+        default_success_sound = f"{script_path()}success.mp3"
+        if not os.path.exists(default_success_sound):
+            raise Exception("default success sound doesn't exist! (success.mp3 - in the script folder)")
+    res = default_success_sound
+    print("default_success_sound",res)
+    return res
+
+def get_default_error_sound():
+    default_error_sound = Data.DefaultErrorSound
+    if default_error_sound is None or default_error_sound == '' or default_error_sound == "DEFAULT":
+        default_error_sound = f"{script_path()}error.mp3"
+        if not os.path.exists(default_error_sound):
+            raise Exception("default error sound doesn't exist! (error.mp3 - in the script folder)")
+    res = default_error_sound
+    print("default_error_sound",res)
     return res
 
 def get_video_metadata(video_path):
@@ -248,31 +284,40 @@ def decollide_clip(target_clip, folder_path):
             print("error during clip decollision.")
 
 def process_clip(event):
-    target_clip = find_latest_file(Data.OutputDir, '\\*')
+    try:
+        target_clip = find_latest_file(Data.OutputDir, '\\*')
 
-    dir = os.path.dirname(target_clip)
-    rawfile = os.path.basename(target_clip)
-    title = get_window_title()
-    newFolder = f"{dir}\\{title}"
+        dir = os.path.dirname(target_clip)
+        rawfile = os.path.basename(target_clip)
+        title = get_window_title()
+        newFolder = f"{dir}\\{title}"
 
-    name_prefix = f"{get_window_title()} " if get_data_prefix_game_name() else ""
-    
-    if not os.path.exists(newFolder):
-        os.makedirs(newFolder)
+        name_prefix = f"{get_window_title()} " if get_data_prefix_game_name() else ""
+        
+        if not os.path.exists(newFolder):
+            os.makedirs(newFolder)
 
-    data_extension = get_data_extension()
-    
-    file =      f"{strip_ext(rawfile)}.{data_extension}"
+        data_extension = get_data_extension()
+        
+        file =      f"{strip_ext(rawfile)}.{data_extension}"
 
-    oldPath =   f"{dir}\\{file}"
-    newfile =   f"{name_prefix}{strip_ext(rawfile)}.{data_extension}"
-    newPath =   f"{newFolder}\\{newfile}"
+        oldPath =   f"{dir}\\{file}"
+        newfile =   f"{name_prefix}{strip_ext(rawfile)}.{data_extension}"
+        newPath =   f"{newFolder}\\{newfile}"
 
-    shutil.move(oldPath, newPath)
-    print(f"moved '{oldPath}' to '{newPath}'")
+        shutil.move(oldPath, newPath)
+        print(f"moved '{oldPath}' to '{newPath}'")
 
-    if(Data.DecollideClips):
-        decollide_clip(newPath, newFolder)
+        if(Data.DecollideClips):
+            decollide_clip(newPath, newFolder)
+
+        if(get_playsound_success_bool()):
+            playsound.playsound(get_default_success_sound())
+    except Exception as e:
+        print(f"error during process_clip:{e}\n################\n", traceback.format_exc())
+
+        if(get_playsound_error_bool()):
+            playsound.playsound(get_default_error_sound())
 
 
 def on_event(event):
@@ -366,19 +411,38 @@ def script_update(settings):
             ffprobe_path = "ffprobe"
     Data.FFPROBEExePath = ffprobe_path
 
+    
+    Data.PlaySoundSuccess = S.obs_data_get_bool(settings, "playsoundsuccess")
+
+    default_success_sound = S.obs_data_get_string(settings, "defaultsuccesssound")
+    if default_success_sound == "DEFAULT":
+        default_success_sound = f"{script_path()}\\success.mp3"
+        if not os.path.exists(default_success_sound):
+            raise Exception("default success sound doesn't exist! (success.mp3 - in the script folder)")
+    Data.DefaultSuccessSound = default_success_sound
+
+
+    Data.PlaySoundError = S.obs_data_get_bool(settings, "playsounderror")
+
+    default_error_sound = S.obs_data_get_string(settings, "defaulterrorssound")
+    if default_error_sound == "DEFAULT":
+        default_error_sound = f"{script_path()}\\error.mp3"
+        if not os.path.exists(default_error_sound):
+            raise Exception("default error sound doesn't exist! (error.mp3 - in the script folder)")
+    Data.DefaultErrorSound = default_error_sound
 
 
 def script_description():
     # desc = "Renames and organizes recordings into subfolders like NVidia ShadowPlay.\n\nAuthor: francedv23, enkhayzo (added features)"
-    desc = ("<h3>OBS Recording Organizer Upgraded <br> (<u>09.2024</u> update)</h3>"
-            "<hr>"
-            "Renames and organizes recordings into subfolders similar to NVIDIA ShadowPlay (<i>NVIDIA GeForce Experience</i>).<br><br>"
-            "<small><a href='https://github.com/EnKhayzo/OBS-Recordings-Organizer'>GitHub repo link</a></small><br><br>"
-            "<small>Original author:</small> <a href='https://obsproject.com/forum/resources/obs-recordings-organizer.1707/'><b>francedv23</b></a><br>"
-            "<small>Updated by:</small> <b>enkhayzo</b><br><br>"
-            "<small>Markup description by </small> <a href='https://github.com/padiix/OBS-Recordings-Organizer'><b>padii</b></a><small>'s fork (thank you)</small><br><br>"
-            "<small>❤️ If you wish to support my work, i have a <a href='https://ko-fi.com/enkhayzo'>Ko-fi</a> page, thank you💕</small><br><br>"
-            "<h4>Settings:</h4>")
+    desc = (f"<h3>OBS Recording Organizer Upgraded <br> v.{version.get_version()}</h3>"
+             "<hr>"
+             "Renames and organizes recordings into subfolders similar to NVIDIA ShadowPlay (<i>NVIDIA GeForce Experience</i>).<br><br>"
+             "<small><a href='https://github.com/EnKhayzo/OBS-Recordings-Organizer'>GitHub repo link</a></small><br><br>"
+             "<small>Original author:</small> <a href='https://obsproject.com/forum/resources/obs-recordings-organizer.1707/'><b>francedv23</b></a><br>"
+             "<small>Updated by:</small> <b>enkhayzo</b><br><br>"
+             "<small>Markup description by </small> <a href='https://github.com/padiix/OBS-Recordings-Organizer'><b>padii</b></a><small>'s fork (thank you)</small><br><br>"
+             "<small>❤️ If you wish to support my work, i have a <a href='https://ko-fi.com/enkhayzo'>Ko-fi</a> page, thank you💕</small><br><br>"
+             "<h4>Settings:</h4>")
     return desc
 
 
@@ -440,5 +504,41 @@ def script_properties():
         str("DEFAULT")
     )
     S.obs_property_set_long_description(ffprobe_exe_path, "if not set, it looks for ffprobe.exe in the script's folder; otherwise it checks for a directory that contains ffprobe.exe in the PATH (akin to a normal CMD invokation 'ffprobe ...')")
+
+
+
+    S.obs_properties_add_bool(
+        props,
+        "playsoundsuccess",
+        "Play a sound when saving a clip",
+    )
+
+    default_success_sound = S.obs_properties_add_path(
+        props, 
+        "defaultsuccesssound", 
+        "Custom Saved Clip Sound", 
+        S.OBS_PATH_FILE,
+        "*.*", 
+        str("DEFAULT")
+    )
+    S.obs_property_set_long_description(default_success_sound, "the path of the sound file that will be played when you save a clip (through replay buffer or normal recording)")
+
+
+    S.obs_properties_add_bool(
+        props,
+        "playsounderror",
+        "Play a sound on error (during saving)",
+    )
+
+    default_error_sound = S.obs_properties_add_path(
+        props, 
+        "defaulterrorsound", 
+        "Custom Clip Error Sound", 
+        S.OBS_PATH_FILE,
+        "*.*", 
+        str("DEFAULT")
+    )
+    S.obs_property_set_long_description(default_error_sound, "the path of the sound file that will be played when an error occurs during saving")
+
 
     return props
