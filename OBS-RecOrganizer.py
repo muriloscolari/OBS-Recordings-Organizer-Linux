@@ -218,6 +218,7 @@ def cut_video(input_path, output_path, start_time, end_time):
             '-ss', str(start_time), 
             '-to', str(end_time), 
             '-i', input_path,
+            '-map', '0',
             '-c', 'copy', 
             output_path 
         ], onLine)
@@ -227,6 +228,7 @@ def cut_video(input_path, output_path, start_time, end_time):
             '-y',
             '-ss', str(start_time), 
             '-to', str(end_time), 
+            '-map', '0',
             '-i', input_path, 
             output_path 
         ], onLine)
